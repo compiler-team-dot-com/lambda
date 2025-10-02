@@ -14,6 +14,10 @@ type _ expr =
   | Lam : string * 'a ty * 'b expr -> ('a -> 'b) expr
   | App : ('a -> 'b) expr * 'a expr -> 'b expr
 
+(* Typed environment as an existential wrapper. *)
+type packed_val = Pack : 'a ty * 'a -> packed_val
+type context = (string * packed_val) list
+
 (* Generate fresh variable names. *)
 let fresh () =
   let counter = ref 0 in
