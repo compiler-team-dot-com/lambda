@@ -1,0 +1,4 @@
+profile = default
+exp-grouping = preserve
+single-case = sparse
+type-decl = sparse
