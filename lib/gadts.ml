@@ -84,3 +84,32 @@ let rec swivelD : type a n. (a, n) dtree -> (a, n) dtree = function
   | EmptyD -> EmptyD
   | TreeD (left, v, right, o) ->
       TreeD (swivelD right, v, swivelD left, MaxFlip o)
+
+(* Some properties of type equality *)
+type (_, _) eql = Refl : ('a, 'a) eql
+
+let symm : type a b. (a, b) eql -> (b, a) eql = fun Refl -> Refl
+
+let trans : type a b c. (a, b) eql -> (b, c) eql -> (a, c) eql =
+ fun Refl Refl -> Refl
+
+module Lift (T : sig
+  type _ t
+end) : sig
+  val lift : ('a, 'b) eql -> ('a T.t, 'b T.t) eql
+end = struct
+  let lift : type a b. (a, b) eql -> (a T.t, b T.t) eql = fun Refl -> Refl
+end
+
+let cast : type a b. (a, b) eql -> a -> b = fun Refl x -> x
+
+(* Encoding other GADTs with eql *)
+type ('a, 'n) etree =
+  | EmptyE : ('n, z) eql -> ('a, 'n) etree
+  | TreeE :
+      ('n, 'm s) eql * ('a, 'm) etree * 'a * ('a, 'm) etree
+      -> ('a, 'n) etree
+
+let rec depthE : type a n. (a, n) etree -> n = function
+  | EmptyE Refl -> Z
+  | TreeE (Refl, left, _, _) -> S (depthE left)
