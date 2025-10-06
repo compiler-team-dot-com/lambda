@@ -1,16 +1,26 @@
-open Lambda
-
-let nested = Lam ("x", TInt, Lam ("x", TInt, Add (Var ("x", TInt), LitInt 1)))
-let expr = App (nested, LitInt 5)
+open LambdaLib
 
 let () =
-  match eval_full expr with
-  | Lam (y, _, body) ->
-      (* apply inner lambda to 10 *)
-      let body_app = App (Lam (y, TInt, body), LitInt 10) in
-      begin
-        match eval_full body_app with
-        | LitInt n -> Printf.printf "Result: %d\n" n
-        | _ -> Printf.printf "Unexpected result\n"
-      end
-  | _ -> Printf.printf "Unexpected result\n"
+  let open Vec in
+  let v = VCons (1, VCons (2, VCons (3, VCons (4, VNil)))) in
+  let (Ex (vfilt, k)) = filter (fun x -> x mod 2 = 0) v in
+  print_string "Filtered vector: ";
+  print_vec vfilt (Printf.printf "%d");
+  Printf.printf "Filtered length: %d\n" (nat_to_int k);
+  (match k with
+  | Z -> ()
+  | S _ ->
+      let _h = head vfilt in
+      ());
+  ()
+
+type showable = Show : ('a -> string) * 'a -> showable
+
+let show_all xs = List.map (fun (Show (f, x)) -> f x) xs
+
+let () =
+  let xs = 1 :: [ 2 ] in
+  let xs = List.map (fun s -> Show (string_of_int, s)) xs in
+  let ss = show_all xs in
+  let _ = List.iter print_endline ss in
+  ()
