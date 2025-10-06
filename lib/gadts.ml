@@ -55,3 +55,32 @@ let topG : type a n. (a, n s) gtree -> a = function TreeG (_, v, _) -> v
 let rec swivelG : type a n. (a, n) gtree -> (a, n) gtree = function
   | EmptyG -> EmptyG
   | TreeG (left, v, right) -> TreeG (swivelG right, v, swivelG left)
+
+(* A max function for type-level natural numbers *)
+type (_, _, _) max =
+  | MaxEq : 'a -> ('a, 'a, 'a) max
+  | MaxFlip : ('a, 'b, 'c) max -> ('b, 'a, 'c) max
+  | MaxSuc : ('a, 'b, 'a) max -> ('a s, 'b, 'a s) max
+
+(* given a max proof, return the maximum *)
+let rec max : type a b c. (a, b, c) max -> c = function
+  | MaxEq x -> x
+  | MaxSuc m -> S (max m)
+  | MaxFlip m -> max m
+
+type ('a, _) dtree =
+  | EmptyD : ('a, z) dtree
+  | TreeD :
+      ('a, 'm) dtree * 'a * ('a, 'n) dtree * ('m, 'n, 'o) max
+      -> ('a, 'o s) dtree
+
+let depthD : type a n. (a, n) dtree -> n = function
+  | EmptyD -> Z
+  | TreeD (_, _, _, o) -> S (max o)
+
+let topD : type a n. (a, n s) dtree -> a = function TreeD (_, v, _, _) -> v
+
+let rec swivelD : type a n. (a, n) dtree -> (a, n) dtree = function
+  | EmptyD -> EmptyD
+  | TreeD (left, v, right, o) ->
+      TreeD (swivelD right, v, swivelD left, MaxFlip o)
