@@ -47,26 +47,25 @@ let rec free_vars_expr : type a. a expr -> string list = function
 
 (* capture-avoiding substitution using a packed value and ty_eq *)
 let rec substitute : type a. string -> packed_val -> a expr -> a expr =
- fun x pv e ->
-  match e with
-  | LitInt _ | LitBool _ -> e
+ fun x (PackVal (ty_v, v) as pv) -> function
+  | LitInt _ as e -> e
+  | LitBool _ as e -> e
   | Add (e1, e2) -> Add (substitute x pv e1, substitute x pv e2)
   | Eq (e1, e2) -> Eq (substitute x pv e1, substitute x pv e2)
+  | App (f, arg) -> App (substitute x pv f, substitute x pv arg)
   | Var (y, ty_y) ->
       if x = y then
-        match pv with
-        | PackVal (ty_v, v) -> (
-            (* try to prove ty_v = ty_y; if so, we can safely return v *)
-            match ty_eq ty_v ty_y with
-            | Some Refl -> v (* typechecker learns v : a expr here *)
-            | None -> failwith "Type mismatch in substitution")
+        (* try to prove ty_v = ty_y; if so, we can safely return v *)
+        match ty_eq ty_v ty_y with
+        | Some Refl -> v (* typechecker learns v : a expr here *)
+        | None -> failwith "Type mismatch in substitution"
       else Var (y, ty_y)
   | Lam (y, ty_y, body) ->
       if x = y then
         (* binder shadows x: do not substitute under it *)
         Lam (y, ty_y, body)
       else
-        let pv_free = match pv with PackVal (_, v) -> free_vars_expr v in
+        let pv_free = free_vars_expr v in
         if List.mem y pv_free then
           (* alpha-rename y to avoid capture *)
           let y' = fresh y in
@@ -75,7 +74,6 @@ let rec substitute : type a. string -> packed_val -> a expr -> a expr =
           in
           Lam (y', ty_y, substitute x pv renamed_body)
         else Lam (y, ty_y, substitute x pv body)
-  | App (f, arg) -> App (substitute x pv f, substitute x pv arg)
 
 (* small-step semantics: is_value and step *)
 exception Stuck
@@ -85,9 +83,9 @@ let is_value : type a. a expr -> bool = function
   | _ -> false
 
 let rec step : type a. a expr -> a expr = function
-  | App (Lam (x, ty_x, body), v) when is_value v ->
+  | App (Lam (x, ty_x, body), arg) when is_value arg ->
       (* when applying a lambda, pack the argument with its declared type *)
-      substitute x (PackVal (ty_x, v)) body
+      substitute x (PackVal (ty_x, arg)) body
   | App (f, arg) when not (is_value f) -> App (step f, arg)
   | App (f, arg) -> App (f, step arg)
   | Add (LitInt n1, LitInt n2) -> LitInt (n1 + n2)
