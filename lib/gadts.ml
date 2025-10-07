@@ -79,9 +79,19 @@ type ('a, _) dtree =
 type 'a edtree = E : ('a, 'n) dtree -> 'a edtree
 
 (* Returns a tree of *some* depth. *)
-let dtree_of_option : type a n. a option -> a edtree = function
+let dtree_of_option : type a. a option -> a edtree = function
   | None -> E EmptyD
   | Some v -> E (TreeD (EmptyD, v, EmptyD, MaxEq Z))
+
+(* A value of type ('a, 'k) adtree is a (record containing a) function
+   which accepts a tree of any depth with element type 'a and returns a value of type 'k. *)
+type ('a, 'k) adtree = { k : 'n. ('a, 'n) dtree -> 'k }
+
+let dtree_of_option_k : type a k. a option -> (a, k) adtree -> k =
+ fun opt { k } ->
+  match opt with
+  | None -> k EmptyD
+  | Some v -> k (TreeD (EmptyD, v, EmptyD, MaxEq Z))
 
 let depthD : type a n. (a, n) dtree -> n = function
   | EmptyD -> Z
