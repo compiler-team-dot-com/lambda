@@ -74,6 +74,15 @@ type ('a, _) dtree =
       ('a, 'm) dtree * 'a * ('a, 'n) dtree * ('m, 'n, 'o) max
       -> ('a, 'o s) dtree
 
+(* An dtree but existentially quantified on the depth, so that
+   we can return tree of different depths in different branches. *)
+type 'a edtree = E : ('a, 'n) dtree -> 'a edtree
+
+(* Returns a tree of *some* depth. *)
+let dtree_of_option : type a n. a option -> a edtree = function
+  | None -> E EmptyD
+  | Some v -> E (TreeD (EmptyD, v, EmptyD, MaxEq Z))
+
 let depthD : type a n. (a, n) dtree -> n = function
   | EmptyD -> Z
   | TreeD (_, _, _, o) -> S (max o)
