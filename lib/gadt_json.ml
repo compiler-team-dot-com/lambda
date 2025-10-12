@@ -143,3 +143,60 @@ and unpack_uarr : type a. a tyarr -> ujson list -> a option =
 
 (* With type refinement we learn about types by inspecting values.
    Predicates should return useful evidence rather than true of false. *)
+
+(* The set of all JSON values which can be built from strings and arrays: *)
+type _ str_tyjs =
+  | SStr : string str_tyjs
+  | SArr : 'a str_tyarr -> 'a str_tyjs
+
+and 'a str_tyarr =
+  | SNil : unit str_tyarr
+  | ( :: ) : 'a str_tyjs * 'b str_tyarr -> ('a * 'b) str_tyarr
+
+(* Predicate which checks whether a JSON type is "stringy": *)
+
+(* Building evidence that a JSON type involves only arrays and strings: *)
+let rec is_stringy : type a. a tyjson -> a str_tyjs option = function
+  | TyStr -> Some SStr
+  | TyNum -> None
+  | TyBool -> None
+  | TyNull _ -> None
+  | TyArr arr -> (
+      match is_stringy_array arr with
+      | None -> None
+      | Some sarr -> Some (SArr sarr))
+
+and is_stringy_array : type a. a tyarr -> a str_tyarr option = function
+  | TyNil -> Some SNil
+  | x :: xs -> (
+      match (is_stringy x, is_stringy_array xs) with
+      | Some x, Some xs -> Some (x :: xs)
+      | _ -> None)
+
+(* Building evidence that a JSON value involved only arrays and strings: *)
+let rec is_stringyV : type a. a tjson -> a str_tyjs option = function
+  | Str _ -> Some SStr
+  | Num _ -> None
+  | Bool _ -> None
+  | Null -> None
+  | Arr arr -> (
+      match is_stringy_arrayV arr with
+      | None -> None
+      | Some sarr -> Some (SArr sarr))
+
+and is_stringy_arrayV : type a. a tarr -> a str_tyarr option = function
+  | Nil -> Some SNil
+  | x :: xs -> (
+      match (is_stringyV x, is_stringy_arrayV xs) with
+      | Some x, Some xs -> Some (x :: xs)
+      | _ -> None)
+
+(* Use the evidence returned to reveal facts about a JSON value: *)
+let show_stringy_checked : type a. a str_tyjs -> a -> string =
+ fun ty v -> match (ty, v) with SStr, v -> v | SArr _, _arr -> ""
+
+let show_stringy : type a. a tyjson -> a -> string =
+ fun ty v ->
+  match is_stringy ty with
+  | None -> ""
+  | Some evidence -> show_stringy_checked evidence v
