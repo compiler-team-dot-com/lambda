@@ -115,3 +115,31 @@ let _ =
          :: TyNil))
   in
   staged ("one", (true, (3.4, ((("four", ()), (None, ())), ()))))
+
+(* Argument: It is typically easier to verify that data matches a particular shape
+             than to determine the shape of arbitrary data. *)
+
+let rec unpack_ujson : type a. a tyjson -> ujson -> a option =
+ fun ty v ->
+  match (ty, v) with
+  | TyStr, UStr s -> Some s
+  | TyNum, UNum u -> Some u
+  | TyBool, UBool b -> Some b
+  | TyNull _, UNull -> Some None
+  | TyNull j, v -> (
+      match unpack_ujson j v with Some v -> Some (Some v) | None -> None)
+  | TyArr a, UArr arr -> unpack_uarr a arr
+  | _ -> None
+
+and unpack_uarr : type a. a tyarr -> ujson list -> a option =
+ fun ty v ->
+  match (ty, v) with
+  | TyNil, [] -> Some ()
+  | j :: js, v :: vs -> (
+      match (unpack_ujson j v, unpack_uarr js vs) with
+      | Some v', Some vs' -> Some (v', vs')
+      | _ -> None)
+  | _ -> None
+
+(* With type refinement we learn about types by inspecting values.
+   Predicates should return useful evidence rather than true of false. *)
