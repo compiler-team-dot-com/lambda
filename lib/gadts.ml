@@ -132,3 +132,14 @@ type ('a, 'n) etree =
 let rec depthE : type a n. (a, n) etree -> n = function
   | EmptyE Refl -> Z
   | TreeE (Refl, left, _, _) -> S (depthE left)
+
+type _ is_zero =
+  | Is_zero : z is_zero
+  | Is_succ : _ s is_zero
+
+let is_emptyD : type a n. (a, n) dtree -> n is_zero = function
+  | EmptyD -> Is_zero
+  | TreeD (_, _, _, _) -> Is_succ
+
+let checkedTopD : type a n. (a, n) dtree -> a option =
+ fun t -> match is_emptyD t with Is_succ -> Some (topD t) | Is_zero -> None
