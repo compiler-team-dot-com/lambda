@@ -1,48 +1,56 @@
-module type SYM = sig
-  type 'a repr
+module type Symantics = sig
+  type ('c, 'dv) repr
 
-  val int : int -> 'a repr
-  val bool : bool -> 'a repr
-  val add : 'a repr -> 'a repr -> 'a repr
-  val lam : ('a repr -> 'b repr) -> ('a -> 'b) repr
-  val app : ('a -> 'b) repr -> 'a repr -> 'b repr
-  val if_ : bool repr -> 'a repr -> 'a repr -> 'a repr
+  (* *)
+  val int : int -> ('c, int) repr
+  val bool : bool -> ('c, bool) repr
+
+  (* *)
+  val lam : (('c, 'da) repr -> ('c, 'db) repr) -> ('c, 'da -> 'db) repr
+  val app : ('c, 'da -> 'db) repr -> ('c, 'da) repr -> ('c, 'db) repr
+
+  (* *)
+  val add : ('c, int) repr -> ('c, int) repr -> ('c, int) repr
+
+  val if_ :
+    ('c, bool) repr -> (unit -> 'x) -> (unit -> 'x) -> (('c, 'da) repr as 'x)
 end
 
-module Eval : SYM = struct
-  type 'a repr = 'a
+module Example (S : Symantics) = struct
+  open S
 
-  let int x = x
-  let bool x = x
-  let add = ( + )
+  let test1 () = app (lam (fun x -> x)) (bool true)
+end
+
+(* R evaluates an object term to its value in the metalanguage. *)
+module R : Symantics with type ('c, 'dv) repr = 'dv = struct
+  type ('c, 'dv) repr = 'dv
+
+  let int (x : int) = x
+  let bool (b : bool) = b
   let lam f = f
-  let app f x = f x
-  let if_ c t e = if c then t else e
+  let app e1 e2 = e1 e2
+  let add e1 e2 = e1 + e2
+  let if_ eb et ee = if eb then et () else ee ()
 end
 
-module Pretty : SYM = struct
-  type 'a repr = string
+(* L measures the length of each object term. *)
+module L : Symantics with type ('c, 'dv) repr = int = struct
+  type ('c, 'dv) repr = int
 
-  let int = string_of_int
-  let bool = string_of_bool
-  let add x y = "(" ^ x ^ " + " ^ y ^ ")"
-
-  let lam f =
-    let x = "x" in
-    "(fun " ^ x ^ " -> " ^ f x ^ ")"
-
-  let app f x = f ^ " " ^ x
-  let if_ c t e = "if " ^ c ^ " then " ^ t ^ " else " ^ e
+  let int (_ : int) = 1
+  let bool (_ : bool) = 1
+  let lam f = f 0 + 1
+  let app e1 e2 = e1 + e2 + 1
+  let add e1 e2 = e1 + e2 + 1
+  let if_ eb et ee = eb + et () + ee () + 1
 end
 
 let () =
-  let value =
-    let open Eval in
-    app (lam (fun x -> add x (int 1))) (if_ (bool true) (int 41) (int 0))
-  in
-  let bool_value =
-    let open Pretty in
-    if_ (bool true) (int 1) (int 0)
-  in
-  Printf.printf "Eval: %d\n" value;
-  Printf.printf "Pretty bool: %s\n" bool_value
+  let module ExR = Example (R) in
+  let value = ExR.test1 () in
+  let _ = Printf.printf "Eval: %b\n" value in
+
+  let module ExL = Example (L) in
+  let value = ExL.test1 () in
+  Printf.printf "Eval: %d\n" value
