@@ -46,6 +46,20 @@ module L : Symantics with type ('c, 'dv) repr = int = struct
   let if_ eb et ee = eb + et () + ee () + 1
 end
 
+module C : Symantics with type ('c, 'dv) repr = 'dv code = struct
+  type ('c, 'dv) repr = 'dv code
+
+  let int (x:int) = .<x>.
+  let bool (b:bool) = .<b>.
+  let lam f = .<fun x -> .~(f .<x>.)>.
+  let app e1 e2 = .<.~e1 .~e2>.
+  let fix f = .<let rec self n = .~(f .<self>.) n in self>.
+  let add e1 e2 = .<.~e1 + .~e2>.
+  let mul e1 e2 = .<.~e1 * .~e2>.
+  let leq e1 e2 = .<.~e1 <= .~e2>.
+  let if_ eb et ee = .<if .~eb then .~(et ()) else .~(ee ())>.
+end
+
 let () =
   let module ExR = Example (R) in
   let value = ExR.test1 () in
@@ -53,4 +67,11 @@ let () =
 
   let module ExL = Example (L) in
   let value = ExL.test1 () in
-  Printf.printf "Eval: %d\n" value
+  let _ = Printf.printf "Eval: %d\n" value in
+
+  let open Runcode in
+
+  let module ExC = Example (C) in
+  let value = ExC.test1 () in
+  let _ = Printf.printf "Eval: %b\n" (run value) in
+  ()
