@@ -1,3 +1,18 @@
 (library
  (name lambdaLib)
- (modules lambda stlc tagless vec gadts gadt_json puzzle))
+ (modules lambda stlc vec gadts gadt_json puzzle))
+
+(executable
+ (public_name optimization_intro)
+ (name optimization_intro)
+ (modules optimization_intro))
+
+(executable
+ (public_name basic_gates)
+ (name basic_gates)
+ (modules basic_gates))
+
+(executable
+ (public_name defunctionalization)
+ (name defunctionalization)
+ (modules defunctionalization))
