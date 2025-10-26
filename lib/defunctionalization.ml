@@ -120,6 +120,7 @@ type ('a, 'b) app += List_name : 'a list -> ('a, list_name) app
 
 let inj x = List_name x
 let[@warning "-8"] prj (List_name x) = x
+let[@warning "-8"] [ 1; 2 ] = prj @@ inj [ 1; 2 ]
 
 type ('a, 'n) seq = { decon : ('a, 'n) app -> ('a * ('a, 'n) app) option }
 
@@ -129,12 +130,14 @@ let rec folds (m : 'a monoid) (s : ('a, 'n) seq) : ('a, 'n) app -> 'a =
 
 let sums s c = folds monoid_plus s c
 
-let list_seq : ('a, list_name) seq =
+let[@warning "-8"] list_seq : ('a, list_name) seq =
   {
     decon =
       (fun (List_name l) ->
         match l with [] -> None | h :: t -> Some (h, List_name t));
   }
+
+let[@warning "-8"] 3 = sums list_seq (List_name [ 1; 2 ])
 
 (* Algebras *)
 
@@ -171,9 +174,49 @@ module AddEx2 (I : add_i) = struct
   let res = ntimes 3 M.res
 end
 
+let _ =
+  (* An interpreter *)
+  let module R : add_i with type repr = int = struct
+    type repr = int
+
+    let int = Fun.id
+    let add = ( + )
+  end in
+  let[@warning "-8"] 18 =
+    let module M = AddEx2 (R) in
+    M.res
+  in
+  ()
+
 (* All functors. We would like terms.
 Using first-class modules, turn add_i (a sig) to an ordinary type. *)
 type 'r add_t = (module add_i with type repr = 'r)
+
+let add_ex1 : type r. r add_t -> r =
+ fun (module I) -> I.(add (add (int 1) (int 2)) (int 3))
+
+let rec ntimes : type r. r add_t -> int -> r -> r =
+ fun (module I) n x ->
+  let open I in
+  if n <= 0 then int 0
+  else if n = 1 then x
+  else add x (ntimes (module I) (n - 1) x)
+
+let add_ex2 : type r. r add_t -> r = fun repr -> ntimes repr 3 (add_ex1 repr)
+
+let _ =
+  (* An interpreter *)
+  let module R : add_i with type repr = int = struct
+    type repr = int
+
+    let int = Fun.id
+    let add = ( + )
+  end in
+  let[@warning "-8"] 18 =
+    let r : int add_t = (module R) in
+    add_ex2 r
+  in
+  ()
 
 module type sym = sig
   type 'a repr
@@ -310,3 +353,5 @@ let sym_ex1 =
   let open SymSelf in
   let t1 = add (add (int 1) (int 2)) (int 3) in
   if_ (iszero t1) (int 0) (add t1 (int 1))
+
+let _ = sym_ex1
