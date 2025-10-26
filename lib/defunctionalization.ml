@@ -33,14 +33,19 @@ let[@warning "-8"] [ 2; 2; 2 ] = add (1, [ 1; 1; 1 ])
 (* https://okmij.org/ftp/ML/higher-kind-poly.html *)
 
 let rec sumi : int list -> int = function [] -> 0 | h :: t -> h + sumi t
+let[@warning "-8"] 3 = sumi [ 1; 2 ]
 
 let rec foldi (f : int -> int -> int) (z : int) : int list -> int = function
   | [] -> z
   | h :: t -> f h (foldi f z t)
 
+let[@warning "-8"] 3 = foldi ( + ) 0 [ 1; 2 ]
+
 let rec fold (f : 'a -> 'a -> 'a) (z : 'a) : 'a list -> 'a = function
   | [] -> z
-  | h :: t -> f h (foldi f z t)
+  | h :: t -> f h (fold f z t)
+
+let[@warning "-8"] 3 = fold ( + ) 0 [ 1; 2 ]
 
 type 'a monoid = {
   op : 'a -> 'a -> 'a;
@@ -79,6 +84,34 @@ module FoldS (S : seq_i) = struct
    fun c ->
     match S.decon c with None -> m.unit | Some (h, t) -> m.op h (fold m t)
 end
+
+module SumS (S : seq_i) = struct
+  open S
+  open FoldS (S)
+
+  let sum : int t -> int = fold monoid_plus
+end
+
+module ListS = struct
+  type 'a t = 'a list
+
+  let decon = function [] -> None | h :: t -> Some (h, t)
+end
+
+let[@warning "-8"] 3 =
+  let module M = SumS (ListS) in
+  M.sum [ 1; 2 ]
+
+module ArrS = struct
+  type 'a t = int * 'a array
+
+  let decon (i, a) =
+    if i >= Array.length a || i < 0 then None else Some (a.(i), (i + 1, a))
+end
+
+let[@warning "-8"] 3 =
+  let module M = SumS (ArrS) in
+  M.sum (0, [| 1; 2 |])
 
 (* Second approach *)
 type ('a, 'b) app = ..
@@ -151,13 +184,47 @@ module type sym = sig
   val if_ : bool repr -> 'a repr -> 'a repr -> 'a repr
 end
 
-(* a sample term of the DSL *)
+(* a sample term of the DSL -- as a functor *)
 module SymEx1 (I : sym) = struct
   open I
 
   let t1 = add (add (int 1) (int 2)) (int 3) (* intermediate binding *)
   let res = if_ (iszero t1) (int 0) (add t1 (int 1))
 end
+
+(* First interpreter: evaluator *)
+module R : sym with type 'a repr = 'a = struct
+  type 'a repr = 'a
+
+  let int = Fun.id
+  let add = ( + )
+  let iszero = ( = ) 0
+  let if_ b th el = if b then th else el
+end
+
+(* Second interpreter: a printer *)
+module S : sym with type 'a repr = string = struct
+  type 'a repr = string
+
+  let paren x = "(" ^ x ^ ")"
+
+  let int x =
+    let t = string_of_int x in
+    if x >= 0 then t else paren t
+
+  let add e1 e2 = paren @@ e1 ^ " + " ^ e2
+  let iszero x = paren @@ "iszero " ^ x
+  let if_ b th el = "if " ^ b ^ " then " ^ th ^ " else " ^ el
+end
+
+(* Can now run the examples *)
+let[@warning "-8"] 7 =
+  let module M = SymEx1 (R) in
+  M.res
+
+let[@warning "-8"] "if (iszero ((1 + 2) + 3)) then 0 else (((1 + 2) + 3) + 1)" =
+  let module M = SymEx1 (S) in
+  M.res
 
 module type symF = sig
   type a
@@ -210,6 +277,36 @@ module SymSelf : sym with type 'a repr = 'a sym_term = struct
       module Term = M
     end)
 
-  let iszero : int repr -> bool repr = failwith ""
-  let if_ : bool repr -> 'a repr -> 'a repr -> 'a repr = failwith ""
+  let iszero : int repr -> bool repr =
+   fun (module E) ->
+    let module M (I : sym) = struct
+      module ET = E.Term (I)
+
+      let res = I.iszero ET.res
+    end in
+    (module struct
+      type a = bool
+
+      module Term = M
+    end)
+
+  let if_ : type ar. bool repr -> ar repr -> ar repr -> ar repr =
+   fun (module E) (module E1) (module E2) ->
+    let module M (I : sym) = struct
+      module ET = E.Term (I)
+      module E1T = E1.Term (I)
+      module E2T = E2.Term (I)
+
+      let res = I.if_ ET.res E1T.res E2T.res
+    end in
+    (module struct
+      type a = ar
+
+      module Term = M
+    end)
 end
+
+let sym_ex1 =
+  let open SymSelf in
+  let t1 = add (add (int 1) (int 2)) (int 3) in
+  if_ (iszero t1) (int 0) (add t1 (int 1))
