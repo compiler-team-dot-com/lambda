@@ -16,3 +16,8 @@
  (public_name defunctionalization)
  (name defunctionalization)
  (modules defunctionalization))
+
+(executable
+ (public_name first_class_modules)
+ (name first_class_modules)
+ (modules first_class_modules))
